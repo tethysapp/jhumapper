@@ -1,0 +1,8 @@
+#map, #app-content {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+#inner-app-content {
+    padding: 0;
+}
