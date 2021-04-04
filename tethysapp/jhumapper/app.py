@@ -1,4 +1,5 @@
 from tethys_sdk.base import TethysAppBase, url_map_maker
+from tethys_sdk.app_settings import CustomSetting
 
 
 class Jhumapper(TethysAppBase):
@@ -21,4 +22,28 @@ class Jhumapper(TethysAppBase):
                 url='jhumapper',
                 controller='jhumapper.controllers.home'
             ),
+            # App API
+            UrlMap(
+                name='queryValues',
+                url='jhumapper/queryValues',
+                controller='jhumapper.controllers.query_values'
+            ),
+        )
+
+    def custom_settings(self):
+        return (
+            CustomSetting(
+                name='thredds_wms_base',
+                type=CustomSetting.TYPE_STRING,
+                description="WMS URL to the THREDDS directory containing the Schigella data",
+                required=True,
+                default='http://0.0.0.0:7000/thredds/wms/',
+            ),
+            CustomSetting(
+                name='thredds_opendap_base',
+                type=CustomSetting.TYPE_STRING,
+                description="OPeNDAP URL to the THREDDS directory containing the Schigella data",
+                required=True,
+                default='http://0.0.0.0:7000/thredds/dodsC/',
+            )
         )
