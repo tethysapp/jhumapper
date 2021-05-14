@@ -1,4 +1,6 @@
+import os
 import grids
+import pandas as pd
 
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -14,27 +16,16 @@ def home(request):
     Controller for the app home page.
     """
     schigellafiles = (
-        ('Shigella_Probability_2018_Jan.nc', 'Jan'),
-        ('Shigella_Probability_2018_Feb.nc', 'Feb'),
-        ('Shigella_Probability_2018_Mar.nc', 'Mar'),
-        ('Shigella_Probability_2018_Apr.nc', 'Apr'),
-        ('Shigella_Probability_2018_May.nc', 'May'),
-        ('Shigella_Probability_2018_Jun.nc', 'Jun'),
-        ('Shigella_Probability_2018_Jul.nc', 'Jul'),
-        ('Shigella_Probability_2018_Aug.nc', 'Aug'),
-        ('Shigella_Probability_2018_Sep.nc', 'Sep'),
-        ('Shigella_Probability_2018_Oct.nc', 'Oct'),
-        ('Shigella_Probability_2018_Nov.nc', 'Nov'),
-        ('Shigella_Probability_2018_Dec.nc', 'Dec'),
-        ('Shigella_Probability_LTM_Asymptomatic.nc', 'Asymptomatic'),
-        ('Shigella_Probability_LTM_Symptomatic.nc', 'Symptomatic')
+        ('2018 Monthly Probability', 'probability'),
+        ('Long Term Symptomatic Rate', 'sympt'),
+        ('Long Term Asymptomatic Rate', 'asympt')
     )
     select_layers = SelectInput(
         display_text='Select data layer',
         name='select-layers',
         multiple=False,
         original=True,
-        initial='Jan',
+        initial='probability',
         options=schigellafiles
     )
 
@@ -50,15 +41,35 @@ def query_values(request):
     """
     Controller for the app home page.
     """
-    print(request.GET)
-    print(dict(request.GET))
-    data = request.GET
+    data = dict(request.GET)
 
-    if 'point' in data.keys():
-        print('point')
-    elif 'rectangle' in data.keys():
-        print('rect')
-    elif 'polygon' in data.keys():
-        print('poly')
+    timeseries_obj = grids.TimeSeries(
+        files=[os.path.join(App.get_app_workspace().path, 'Shigella_2018.nc4'), ],
+        var='probability',
+        dim_order=('time', 'lat', 'lon'),
+        interp_units=False,
+    )
 
-    return JsonResponse(data)
+    if 'point[]' in data.keys():
+        coords = data['point[]']
+        ts = timeseries_obj.point(None, float(coords[0]), float(coords[1]))
+    elif 'rectangle[]' in data.keys():
+        coords = data['rectangle[]']
+        ts = timeseries_obj.bound(
+            (None, float(coords[0]), float(coords[1])),
+            (None, float(coords[2]), float(coords[3])),
+        )
+    # elif 'polygon' in data.keys():
+    #     ts = None
+    else:
+        raise ValueError('Unrecognized query request')
+
+    # this is a work around for a bug in pandas handling dates as strings
+    # https://github.com/pandas-dev/pandas/issues/32264
+    ts.index = pd.Index(pd.to_datetime(ts.datetime, unit="s")).strftime("%Y-%m")
+    del ts['datetime']
+
+    return JsonResponse({
+        'x': ts.index.to_list(),
+        'y': ts.values.flatten().tolist(),
+    })

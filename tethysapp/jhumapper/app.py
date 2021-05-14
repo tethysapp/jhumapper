@@ -3,7 +3,7 @@ from tethys_sdk.app_settings import CustomSetting
 
 
 class Jhumapper(TethysAppBase):
-    name = 'Schigella Risk Assessment Tool'
+    name = 'Shigella Risk Assessment Tool'
     index = 'jhumapper:home'
     icon = 'jhumapper/images/icon.gif'
     package = 'jhumapper'
@@ -37,13 +37,6 @@ class Jhumapper(TethysAppBase):
                 type=CustomSetting.TYPE_STRING,
                 description="WMS URL to the THREDDS directory containing the Schigella data",
                 required=True,
-                default='http://0.0.0.0:7000/thredds/wms/',
+                default='http://0.0.0.0:7000/thredds/wms/data/jhudata/',
             ),
-            CustomSetting(
-                name='thredds_opendap_base',
-                type=CustomSetting.TYPE_STRING,
-                description="OPeNDAP URL to the THREDDS directory containing the Schigella data",
-                required=True,
-                default='http://0.0.0.0:7000/thredds/dodsC/',
-            )
         )

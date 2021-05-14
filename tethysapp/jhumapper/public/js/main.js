@@ -1,15 +1,26 @@
 const map = L.map('map', {
-    zoom: 4,
+    zoom: 3,
     minZoom: 2,
     zoomSnap: .5,
     boxZoom: true,
     maxBounds: L.latLngBounds(L.latLng(-100.0, -270.0), L.latLng(100.0, 270.0)),
     center: [0, 0],
+    timeDimension: true,
+    timeDimensionControl: true,
+    timeDimensionControlOptions: {
+        position: "bottomleft",
+        autoPlay: true,
+        loopButton: true,
+        backwardButton: true,
+        forwardButton: true,
+        timeSliderDragUpdate: true,
+        minSpeed: 2,
+        maxSpeed: 6,
+        speedStep: 1,
+    },
 })
 
-let layerSchigella = null;
-let selectedNetCDF = $("#select-layers option:selected").text();
-let selectedLayer = $("#select-layers").val();
+let layerShigella = null;
 
 const layerDraw = new L.FeatureGroup();
 layerDraw.addTo(map);
@@ -17,9 +28,10 @@ const drawControl = new L.Control.Draw({
     position: 'topleft',
     draw: {
         polyline: false,
-        polygon: {
-            allowIntersection: false, // Restricts shapes to simple polygons
-        },
+        // polygon: {
+        //     allowIntersection: false, // Restricts shapes to simple polygons
+        // },
+        polygon: false,
         circle: false, // Turns off this drawing tool
         rectangle: true,
         marker: true
@@ -37,43 +49,53 @@ const layerControl = L.control.layers(basemaps, {"Drawings": layerDraw}, {collap
 const legend = L.control({position: 'bottomright'});
 legend.onAdd = () => {
     let div = L.DomUtil.create('div', 'legend');
-    let url = `${URL_THREDDS}${selectedNetCDF}?REQUEST=GetLegendGraphic&LAYER=${$("#select-layers").val()}&COLORSCALERANGE=0,50`;
+    let url = `${URL_THREDDS}?REQUEST=GetLegendGraphic&LAYER=${$("#select-layers").val()}&COLORSCALERANGE=0,50`;
     div.innerHTML = `<img src="${url}" alt="legend" style="width:100%; float:right;">`
     return div
 };
 
-const addWMS = function (url, layer) {
-    if (layerSchigella !== null) {
-        layerControl.removeLayer(layerSchigella);
-        map.removeLayer(layerSchigella);
+const addWMS = function () {
+    let layer = $("#select-layers").val()
+    if (layerShigella !== null) {
+        layerControl.removeLayer(layerShigella);
+        map.removeLayer(layerShigella);
     }
-    layerSchigella = L.tileLayer.wms(url, {
+    layerShigella = L.tileLayer.wms(URL_THREDDS, {
         layers: layer,
         format: "image/png",
         transparent: true,
         crossOrigin: false,
         colorscalerange: '0,50',
-    }).addTo(map);
-    layerControl.addOverlay(layerSchigella, "Schigella Layer")
+    });
+    if (layer === 'probability') {
+        layerShigella = L.timeDimension.layer.wms(layerShigella, {
+            name: 'time',
+            requestTimefromCapabilities: true,
+            updateTimeDimension: true,
+            updateTimeDimensionMode: 'replace',
+            cache: 20,
+        })
+    }
+    layerShigella.addTo(map)
+    layerControl.addOverlay(layerShigella, "Shigella Layer")
     legend.addTo(map);
 };
 
 $("#select-layers").change(() => {
-    selectedNetCDF = $("#select-layers option:selected").text();
-    selectedLayer = $("#select-layers").val();
-    addWMS(`${URL_THREDDS}${selectedNetCDF}`, selectedLayer)
+    addWMS()
 })
 
-addWMS(`${URL_THREDDS}${selectedNetCDF}`, selectedLayer);
+addWMS();
+
 map.addControl(drawControl);
 map.on("draw:drawstart", function (event) {
     layerDraw.clearLayers();
 })
 map.on("draw:created", function (event) {
     layerDraw.addLayer(event.layer);
-    let data = {file: selectedNetCDF}
+    let data = {}
     if (event.layerType === "marker") {
-        data.point = event.layer._latlng  // json {lat, lng}
+        data.point = [event.layer._latlng.lat, event.layer._latlng.lng]  // event.layer._latlng -> json {lat, lng}
     } else if (event.layerType === "rectangle") {
         data.rectangle = [
             event.layer._latlngs[0][0].lat,
@@ -84,18 +106,38 @@ map.on("draw:created", function (event) {
     } else if (event.layerType === "polygon") {
         data.polygon = layerDraw.toGeoJSON()  // geojson object
     }
+
     queryValues(data)
 });
 
 const queryValues = function (querydata) {
-    console.log(querydata)
     $.ajax({
         method: 'GET',
         url: URL_QUERYVALUES,
-        data: JSON.stringify(querydata),
-        contentType: 'application/json',
+        data: querydata,
         success: function (result) {
-            alert(result)
-        }
+            $("#chart_modal").modal("show");
+            plotlyTimeseries(result)
+        },
     })
+}
+
+function plotlyTimeseries(data) {
+    let layout = {
+        title: 'Schigella Probability v Time',
+        xaxis: {title: 'Time'},
+        yaxis: {title: 'Probability (%)'}
+    };
+
+    let values = {
+        x: data.x,
+        y: data.y,
+        title: 'probabilities',
+        mode: 'lines+markers',
+        type: 'scatter'
+    };
+    Plotly.newPlot('chart', [values], layout);
+    let chart = $("#chart");
+    chart.css('height', 500);
+    Plotly.Plots.resize(chart[0]);
 }
