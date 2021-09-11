@@ -28,10 +28,9 @@ const drawControl = new L.Control.Draw({
     position: 'topleft',
     draw: {
         polyline: false,
-        // polygon: {
-        //     allowIntersection: false, // Restricts shapes to simple polygons
-        // },
-        polygon: false,
+        polygon: {
+            allowIntersection: false, // Restricts shapes to simple polygons
+        },
         circle: false, // Turns off this drawing tool
         rectangle: true,
         marker: true
@@ -104,8 +103,10 @@ map.on("draw:created", function (event) {
             event.layer._latlngs[0][2].lng,
         ]  // array of 4 {lat, lng}, clockwise from bottom left
     } else if (event.layerType === "polygon") {
-        data.polygon = layerDraw.toGeoJSON()  // geojson object
+        data.polygon = JSON.stringify(layerDraw.toGeoJSON())  // geojson object
     }
+
+    data.plotType = $("#select-plot-style").val()
 
     queryValues(data)
 });
@@ -123,6 +124,7 @@ const queryValues = function (querydata) {
 }
 
 function plotlyTimeseries(data) {
+    console.log(data)
     let layout = {
         title: 'Schigella Probability v Time',
         xaxis: {title: 'Time'},
