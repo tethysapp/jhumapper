@@ -3,6 +3,7 @@ import random
 import string
 
 import grids
+import numpy as np
 import pandas as pd
 
 from django.shortcuts import render
@@ -59,8 +60,7 @@ def query_values(request):
     """
     workspace_path = App.get_app_workspace().path
     data = dict(request.GET)
-    print(data)
-    stats = ('max', '75%', 'median', 'mean', '25%', 'min', 'values')
+    stats = ('max', '75%', 'median', '25%', 'min', 'values')
 
     ts = grids.TimeSeries(
         files=[os.path.join(workspace_path, 'Shigella_2018.nc4'), ],
@@ -69,8 +69,10 @@ def query_values(request):
         interp_units=False,
         stats=stats
     )
+    plot_type = 'stats'
 
     if 'point[]' in data.keys():
+        plot_type = 'point'
         coords = data['point[]']
         ts = ts.point(None, float(coords[0]), float(coords[1]))
     elif 'rectangle[]' in data.keys():
@@ -88,23 +90,28 @@ def query_values(request):
         ts = ts.shape(tmppath, behavior='dissolve')
     elif 'AdminDist' in data.keys():
         shppath = os.path.join(workspace_path, 'gadm36_levels_shp', 'gadm36_1.shp')
-        ts = ts.shape(shppath, behavior='features', labelby='GID_1')
+        ts = ts.shape(shppath, behavior='feature', label_attr='GID_1', feature=data['AdminDist'])
         ts = ts[[data['AdminDist'], ]]
     else:
         raise ValueError('Unrecognized query request')
 
     timesteps = pd.Index(pd.to_datetime(ts.datetime, unit="s")).strftime("%Y-%m").to_list()
     del ts['datetime']
-    print(ts)
 
-    return JsonResponse({
-        'x': timesteps,
-        'y': ts.values.flatten().tolist(),
-        # 'max': ts['probability_max'].values.flatten().tolist(),
-        # 'p75': ts['probability_75%'].values.flatten().tolist(),
-        # 'median': ts['probability_median'].values.flatten().tolist(),
-        # 'mean': ts['probability_mean'].values.flatten().tolist(),
-        # 'p25': ts['probability_25%'].values.flatten().tolist(),
-        # 'min': ts['probability_min'].values.flatten().tolist(),
-        # 'values': ts['probability_values'].values.flatten().tolist(),
-    })
+    if plot_type == 'point':
+        return JsonResponse({
+            'plotType': plot_type,
+            'x': timesteps,
+            'y': ts['probability'].values.flatten().tolist(),
+        })
+    else:
+        return JsonResponse({
+            'plotType': plot_type,
+            'x': timesteps,
+            'max': ts['probability_max'].values.flatten().tolist(),
+            'p75': ts['probability_75%'].values.flatten().tolist(),
+            'median': ts['probability_median'].values.flatten().tolist(),
+            'p25': ts['probability_25%'].values.flatten().tolist(),
+            'min': ts['probability_min'].values.flatten().tolist(),
+            'values': np.array(list(ts['probability_values'].values[i] for i in range(12))).flatten().tolist()
+        })

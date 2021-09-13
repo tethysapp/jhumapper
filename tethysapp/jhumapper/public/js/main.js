@@ -39,7 +39,6 @@ const drawControl = new L.Control.Draw({
         featureGroup: layerDraw
     }
 });
-
 const URL_OPENSTREETMAP = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const layerOSM = L.tileLayer(URL_OPENSTREETMAP, {attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'});
 const basemaps = {"Open Street Maps": layerOSM.addTo(map)};
@@ -79,6 +78,36 @@ const addWMS = function () {
     layerControl.addOverlay(layerShigella, "Shigella Layer")
     legend.addTo(map);
 };
+let user_shapefile = L.geoJSON(false);
+const getGeoServerGJ = () => {
+    const gsURL = "https://geoserver.hydroshare.org/geoserver/HS-bbaf9b8d1dbd43659afe7befaaa6f2ce/ows"
+    let parameters = L.Util.getParamString(
+        L.Util.extend({
+            service: 'WFS',
+            version: '1.0.0',
+            request: 'GetFeature',
+            typeName: 'HS-bbaf9b8d1dbd43659afe7befaaa6f2ce:gadm36_1',
+            maxFeatures: 1000,
+            outputFormat: 'application/json',
+            parseResponse: 'getJson',
+            srsName: 'EPSG:4326',
+            crossOrigin: 'anonymous'
+        })
+    );
+    $.ajax({
+        async: true,
+        jsonp: false,
+        url: `${gsURL}${parameters}`,
+        contentType: 'application/json',
+        success: (data) => {
+            user_shapefile.clearLayers();
+            user_shapefile.addData(data).addTo(map);
+            mapObj.flyToBounds(user_shapefile.getBounds());
+            layerControl.addOverlay(user_shapefile, "GADM World Admin boundaries")
+        },
+    });
+}
+// getGeoServerGJ()
 
 $("#select-layers").change(() => {
     addWMS()
@@ -105,9 +134,6 @@ map.on("draw:created", function (event) {
     } else if (event.layerType === "polygon") {
         data.polygon = JSON.stringify(layerDraw.toGeoJSON())  // geojson object
     }
-
-    data.plotType = $("#select-plot-style").val()
-
     queryValues(data)
 });
 
@@ -124,22 +150,61 @@ const queryValues = function (querydata) {
 }
 
 function plotlyTimeseries(data) {
-    console.log(data)
     let layout = {
         title: 'Schigella Probability v Time',
         xaxis: {title: 'Time'},
         yaxis: {title: 'Probability (%)'}
     };
+    let plots = []
 
-    let values = {
-        x: data.x,
-        y: data.y,
-        title: 'probabilities',
-        mode: 'lines+markers',
-        type: 'scatter'
+    if (data.plotType === 'point') {
+        plots.push({
+            x: data.x,
+            y: data.y,
+            name: 'Probability',
+            mode: 'lines+markers',
+            type: 'scatter'
+        })
+    } else {
+        const statList = ['max', 'p75', 'median', 'p25', 'min']
+        statList.forEach(
+            stat => plots.push(
+                {
+                    x: data.x,
+                    y: data[stat],
+                    name: stat,
+                    mode: 'lines+markers',
+                    type: 'scatter'
+                }
+            )
+        )
+    }
+
+    let lineChart = $("#line-chart");
+    let histChart = $("#hist-chart");
+
+    Plotly.newPlot('line-chart', plots, layout);
+    lineChart.css('height', 500);
+    Plotly.Plots.resize(lineChart[0]);
+
+    if (data.plotType === 'point') {
+        histChart.empty()
+        histChart.css('height', 0);
+        return
+    }
+
+    layout = {
+        title: 'Distribution of Modeled Risk Values',
+        xaxis: {title: 'Probability (%)'},
+        yaxis: {title: 'Frequency'}
     };
-    Plotly.newPlot('chart', [values], layout);
-    let chart = $("#chart");
-    chart.css('height', 500);
-    Plotly.Plots.resize(chart[0]);
+    plots = [
+        {
+            x: data.values,
+            type: "histogram"
+        }
+    ]
+    Plotly.newPlot('hist-chart', plots, layout);
+    histChart.css('height', 500);
+    Plotly.Plots.resize(histChart[0]);
 }
