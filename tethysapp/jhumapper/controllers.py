@@ -1,6 +1,8 @@
+import glob
 import os
 import random
 import string
+import time
 
 import grids
 import numpy as np
@@ -69,12 +71,24 @@ def query_values(request):
             (None, float(coords[2]), float(coords[3])),
         )
     elif 'polygon' in data.keys():
+        # delete jsons made more than 5 mins ago
+        _5_mins_ago = time.time() - (5 * 60)
+        for polygon_json in glob.glob(os.path.join(workspace_path, '*.json')):
+            if _5_mins_ago > os.stat(polygon_json).st_ctime:
+                os.remove(polygon_json)
+        # create a new one with the user's search
         letters = string.ascii_lowercase
         tmpfile = ''.join(random.choice(letters) for i in range(10)) + '.json'
         tmppath = os.path.join(workspace_path, tmpfile)
         with open(tmppath, 'w') as f:
             f.write(str(data['polygon'][0]))
+        # use the new one to query a time series
         ts = ts.shape(tmppath, behavior='dissolve')
+        for col in ts.columns:
+            if '_shape_' in col:
+                new_col_name = col.replace('_shape', '')
+                ts[new_col_name] = ts[col]
+                del ts[col]
     # elif 'AdminDist' in data.keys():
     #     shppath = os.path.join(workspace_path, 'gadm36_levels_shp', 'gadm36_1.shp')
     #     ts = ts.shape(shppath, behavior='feature', label_attr='GID_1', feature=data['AdminDist'])
@@ -93,6 +107,8 @@ def query_values(request):
             'y': ts['probability'].values.flatten().tolist(),
         })
     else:
+        vals = np.array(list(ts['probability_values'].values[i] for i in range(12))).flatten()
+        vals = vals[np.logical_not(np.isnan(vals))]
         return JsonResponse({
             'plotType': plot_type,
             'x': timesteps,
@@ -101,5 +117,5 @@ def query_values(request):
             'median': ts['probability_median'].values.flatten().tolist(),
             'p25': ts['probability_25%'].values.flatten().tolist(),
             'min': ts['probability_min'].values.flatten().tolist(),
-            'values': np.array(list(ts['probability_values'].values[i] for i in range(12))).flatten().tolist()
+            'values': vals.tolist()
         })
