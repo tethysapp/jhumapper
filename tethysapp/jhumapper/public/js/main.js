@@ -196,15 +196,13 @@ function plotlyTimeseries(data) {
         xaxis: {title: 'Probability (%)'},
         yaxis: {title: 'Cell Count (Frequency)'}
     };
-    plots = [
-        {
-            x: data.values,
-            type: "histogram",
-            xbins: {
-                size: .6
-            }
+    plots = [{
+        x: data.values,
+        type: "histogram",
+        xbins: {
+            size: .6
         }
-    ]
+    }]
     Plotly.newPlot('hist-chart', plots, layout);
     histChart.css('height', 500);
     Plotly.Plots.resize(histChart[0]);
