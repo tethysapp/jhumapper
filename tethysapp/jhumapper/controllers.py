@@ -31,23 +31,9 @@ def home(request):
             ('Long Term Asymptomatic Rate', 'asympt')
         )
     )
-    select_plot_style = SelectInput(
-        display_text='Plot results of boxes/polygons as:',
-        name='select-plot-style',
-        multiple=False,
-        original=True,
-        initial='median',
-        options=(
-            ('Median value', 'median'),
-            ('Mean value', 'mean'),
-            ('Summary Stats', 'sumstat'),
-            ('Histograms', 'histogram')
-        )
-    )
 
     context = {
         "layers": select_layers,
-        "plot_style": select_plot_style,
         "thredds_wms_base": App.get_custom_setting("thredds_wms_base"),
     }
     return render(request, 'jhumapper/home.html', context)
@@ -67,7 +53,8 @@ def query_values(request):
         var='probability',
         dim_order=('time', 'lat', 'lon'),
         interp_units=False,
-        stats=stats
+        stats=stats,
+        fill_value=np.NaN
     )
     plot_type = 'stats'
 
@@ -88,15 +75,16 @@ def query_values(request):
         with open(tmppath, 'w') as f:
             f.write(str(data['polygon'][0]))
         ts = ts.shape(tmppath, behavior='dissolve')
-    elif 'AdminDist' in data.keys():
-        shppath = os.path.join(workspace_path, 'gadm36_levels_shp', 'gadm36_1.shp')
-        ts = ts.shape(shppath, behavior='feature', label_attr='GID_1', feature=data['AdminDist'])
-        ts = ts[[data['AdminDist'], ]]
+    # elif 'AdminDist' in data.keys():
+    #     shppath = os.path.join(workspace_path, 'gadm36_levels_shp', 'gadm36_1.shp')
+    #     ts = ts.shape(shppath, behavior='feature', label_attr='GID_1', feature=data['AdminDist'])
+    #     ts = ts[[data['AdminDist'], ]]
     else:
         raise ValueError('Unrecognized query request')
 
     timesteps = pd.Index(pd.to_datetime(ts.datetime, unit="s")).strftime("%Y-%m").to_list()
     del ts['datetime']
+    ts.round(2)
 
     if plot_type == 'point':
         return JsonResponse({

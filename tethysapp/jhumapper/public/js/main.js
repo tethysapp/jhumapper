@@ -168,15 +168,13 @@ function plotlyTimeseries(data) {
     } else {
         const statList = ['max', 'p75', 'median', 'p25', 'min']
         statList.forEach(
-            stat => plots.push(
-                {
-                    x: data.x,
-                    y: data[stat],
-                    name: stat,
-                    mode: 'lines+markers',
-                    type: 'scatter'
-                }
-            )
+            stat => plots.push({
+                x: data.x,
+                y: data[stat],
+                name: stat,
+                mode: 'lines+markers',
+                type: 'scatter'
+            })
         )
     }
 
@@ -196,12 +194,15 @@ function plotlyTimeseries(data) {
     layout = {
         title: 'Distribution of Modeled Risk Values',
         xaxis: {title: 'Probability (%)'},
-        yaxis: {title: 'Frequency'}
+        yaxis: {title: 'Cell Count (Frequency)'}
     };
     plots = [
         {
             x: data.values,
-            type: "histogram"
+            type: "histogram",
+            xbins: {
+                size: .6
+            }
         }
     ]
     Plotly.newPlot('hist-chart', plots, layout);
