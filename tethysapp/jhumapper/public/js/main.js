@@ -134,20 +134,25 @@ map.on("draw:created", function (event) {
     } else if (event.layerType === "polygon") {
         data.polygon = JSON.stringify(layerDraw.toGeoJSON())  // geojson object
     }
-    queryValues(data)
+
+    $("#chart_modal").modal("show")
+    fetch(`${URL_QUERYVALUES}?${new URLSearchParams(data).toString()}`)
+        .then(res => res.json())
+        .then(res => {
+            console.log(res)
+            plotlyTimeseries(res)
+        })
+    // $.ajax({
+    //     method: 'GET',
+    //     url: URL_QUERYVALUES,
+    //     data: querydata,
+    //     success: function (result) {
+    //         $("#chart_modal").modal("show");
+    //         plotlyTimeseries(result)
+    //     },
+    // })
 });
 
-const queryValues = function (querydata) {
-    $.ajax({
-        method: 'GET',
-        url: URL_QUERYVALUES,
-        data: querydata,
-        success: function (result) {
-            $("#chart_modal").modal("show");
-            plotlyTimeseries(result)
-        },
-    })
-}
 
 function plotlyTimeseries(data) {
     let layout = {

@@ -41,7 +41,7 @@ def home(request):
     return render(request, 'jhumapper/home.html', context)
 
 
-@login_required()
+# @login_required()
 def query_values(request):
     """
     Controller for the app home page.
@@ -56,25 +56,25 @@ def query_values(request):
         dim_order=('time', 'lat', 'lon'),
         interp_units=False,
         stats=stats,
-        fill_value=np.NaN
+        fill_value=np.nan
     )
     plot_type = 'stats'
 
-    if 'point[]' in data.keys():
+    if 'point' in data.keys():
         plot_type = 'point'
-        coords = data['point[]']
+        coords = data['point'][0].split(',')
         ts = ts.point(None, float(coords[0]), float(coords[1]))
-    elif 'rectangle[]' in data.keys():
-        coords = data['rectangle[]']
+    elif 'rectangle' in data.keys():
+        coords = data['rectangle'][0].split(',')
         ts = ts.bound(
             (None, float(coords[0]), float(coords[1])),
             (None, float(coords[2]), float(coords[3])),
         )
     elif 'polygon' in data.keys():
         # delete jsons made more than 5 mins ago
-        _5_mins_ago = time.time() - (5 * 60)
+        _2_mins_ago = time.time() - (2 * 60)
         for polygon_json in glob.glob(os.path.join(workspace_path, '*.json')):
-            if _5_mins_ago > os.stat(polygon_json).st_ctime:
+            if _2_mins_ago > os.stat(polygon_json).st_ctime:
                 os.remove(polygon_json)
         # create a new one with the user's search
         letters = string.ascii_lowercase
@@ -96,14 +96,14 @@ def query_values(request):
     else:
         raise ValueError('Unrecognized query request')
 
-    timesteps = pd.Index(pd.to_datetime(ts.datetime, unit="s")).strftime("%Y-%m").to_list()
-    del ts['datetime']
+    ts.set_index('datetime', inplace=True)
+    ts.index = pd.Index(pd.to_datetime(ts.index, unit="s")).strftime("%Y-%m").to_list()
     ts.round(2)
 
     if plot_type == 'point':
         return JsonResponse({
             'plotType': plot_type,
-            'x': timesteps,
+            'x': ts.index.tolist(),
             'y': ts['probability'].values.flatten().tolist(),
         })
     else:
@@ -111,7 +111,7 @@ def query_values(request):
         vals = vals[np.logical_not(np.isnan(vals))]
         return JsonResponse({
             'plotType': plot_type,
-            'x': timesteps,
+            'x': ts.index.tolist(),
             'max': ts['probability_max'].values.flatten().tolist(),
             'p75': ts['probability_75%'].values.flatten().tolist(),
             'median': ts['probability_median'].values.flatten().tolist(),
